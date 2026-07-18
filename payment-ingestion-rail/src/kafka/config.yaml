@@ -1,0 +1,142 @@
+check.py
+
+import json
+from confluent_kafka import Consumer, KafkaError
+
+print("🔍 Connecting with confluent-kafka engine...")
+
+consumer_config = {
+    'bootstrap.servers': 'localhost:9092',
+    'group.id': 'verification-group-unique',
+    'auto.offset.reset': 'earliest',
+    'enable.auto.commit': False
+}
+
+consumer = Consumer(consumer_config)
+consumer.subscribe(['payment_transactions'])
+
+print("✅ Successfully connected! Scanning the stream for compressed data...\n")
+
+count = 0
+try:
+    while count < 5:
+        msg = consumer.poll(timeout=1.0)
+        if msg is None:
+            continue
+        if msg.error():
+            if msg.error().code() != KafkaError._PARTITION_EOF:
+                print(f"[-] Kafka Error: {msg.error()}")
+            continue
+
+        count += 1
+        # Decode the LZ4/UTF-8 string payload
+        tx = json.loads(msg.value().decode('utf-8'))
+        print(f"[{count}] Decoded Event -> ID: {tx.get('transaction_id')} | Account: {tx.get('account_id')} | Amt: ₹{tx.get('amount')}")
+
+    print("\n🎉 Verification successful! Data is fully confirming inside Kafka.")
+
+except KeyboardInterrupt:
+    pass
+finally:
+    consumer.close()
+
+
+
+
+
+producer.py
+
+import json
+import random
+import time
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from confluent_kafka import Producer
+from pydantic import BaseModel, Field, ValidationError
+from faker import Faker
+
+# Initialize Faker for realistic mock data
+fake = Faker()
+
+# --- STEP 1: DEFINE DATA CONTRACT / SCHEMA ---
+class PaymentTransaction(BaseModel):
+    transaction_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    account_id: str
+    amount: float = Field(..., gt=0.0)
+    currency: str = "INR"
+    merchant: str
+    timestamp: str = Field(default_factory=lambda: datetime.now(datetime.UTC).isoformat())
+    location: str
+    device_ip: str
+
+# Kafka Configuration
+KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+TOPIC_NAME = "payment_transactions"
+
+# Delivery callback to measure and confirm successful message delivery
+def delivery_report(err, msg):
+    if err is not None:
+        print(f"[-] Message delivery failed: {err}")
+    # Under high load, we avoid logging success to prevent console I/O bottlenecks
+
+# Initialize confluent-kafka Producer optimized for high throughput
+producer_config = {
+    'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
+    'client.id': 'payment-ingestion-driver',
+    'queue.buffering.max.messages': 1000000, # Large queue to absorb spikes
+    'linger.ms': 10,                         # Batch messages within a 10ms window
+    'batch.num.messages': 5000,              # Target batch size
+    'compression.type': 'lz4'                # Compress payload to optimize network transfer
+}
+producer = Producer(producer_config)
+
+def generate_mock_transaction() -> dict:
+    """Generates a raw dictionary representing a financial event."""
+    return {
+        "account_id": f"ACC-{random.randint(10000, 99999)}",
+        "amount": round(random.uniform(10.0, 150000.0), 2),
+        "merchant": fake.company(),
+        "location": fake.city(),
+        "device_ip": fake.ipv4()
+    }
+
+def worker_thread():
+    """Worker thread running a continuous generate-and-publish loop."""
+    while True:
+        raw_data = generate_mock_transaction()
+        try:
+            # Enforce Data Contract / Schema validation on ingestion boundary
+            validated_tx = PaymentTransaction(**raw_data)
+            payload = validated_tx.model_dump_json()
+            
+            # Use account_id as the partition key to guarantee ordered event streams
+            producer.produce(
+                topic=TOPIC_NAME,
+                key=validated_tx.account_id,
+                value=payload,
+                callback=delivery_report
+            )
+        except ValidationError as e:
+            print(f"[-] Schema violation detected. Dropping payload: {e}")
+        except BufferError:
+            # Handle local buffer saturation from high TPS
+            producer.poll(0.1)
+            
+        # Yield execution momentarily to maintain continuous processing flow
+        producer.poll(0)
+
+def run_load_test(thread_count=4):
+    """Orchestrates multi-threaded worker pools to achieve high throughput."""
+    print(f"[+] Starting high-throughput multi-threaded ingestion driver on {thread_count} threads...")
+    print(f"[+] Directing stream to Kafka topic: '{TOPIC_NAME}'...")
+    
+    with ThreadPoolExecutor(max_workers=thread_count) as executor:
+        futures = [executor.submit(worker_thread) for _ in range(thread_count)]
+        # Continuously monitor and flush messages
+        while True:
+            producer.flush(1.0)
+            time.sleep(1)
+
+if __name__ == "__main__":
+    run_load_test(thread_count=4)

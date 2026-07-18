@@ -1,0 +1,100 @@
+version: '3.8'
+
+networks:
+  ingestion_network:
+    driver: bridge
+  analytics_network:
+    driver: bridge
+
+services:
+  # --- BULLET 2: KAFKA EVENT BUS ---
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: payment_kafka
+    ports:
+      - "9092:9092"
+    networks:
+      - ingestion_network
+      - analytics_network
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_NUM_REPRODUCTIONS: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+
+  # --- BULLET 3: PYFLINK INFRASTRUCTURE ---
+  flink-jobmanager:
+    image: custom-pyflink:1.18.0  # Changed to reflect your actual 1.18 Dockerfile configuration
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flink_jobmanager
+    ports:
+      - "8081:8081"
+    networks:
+      - analytics_network
+      - ingestion_network
+    volumes:
+      - ./payment-ingestion-rail/src/flink:/opt/flink/usrlib
+    command: jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+
+  flink-taskmanager:
+    image: custom-pyflink:1.18.0  # Changed to match the JobManager custom image
+    container_name: flink_taskmanager
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - flink-jobmanager
+    networks:
+      - analytics_network
+      - ingestion_network
+    volumes:
+      - .:/opt/flink/workspace
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 2
+        
+  # --- BULLET 4: APACHE AIRFLOW ORCHESTRATOR ---
+  airflow:
+    image: puckel/docker-airflow:1.10.9
+    container_name: pipeline_airflow
+    ports:
+      - "8080:8080"
+    networks:
+      - analytics_network
+    volumes:
+      - ./dags:/usr/local/airflow/dags
+    command: webserver
+
+  # --- BULLET 3: LOCAL DATABRICKS / DELTA LAKE INFRASTRUCTURE (PySpark Engine) ---
+  spark-delta:
+    image: bde2020/spark-master:3.3.0-hadoop3.3
+    container_name: spark_lakehouse
+    ports:
+      - "8082:8080"
+      - "7077:7077"
+    networks:
+      - analytics_network
+    volumes:
+      - ./data:/opt/spark/data
+      - ./src:/opt/spark/src
+      - ./conf:/opt/spark/conf
+      

@@ -1,0 +1,7 @@
+confluent-kafka==2.3.0
+pydantic==2.6.1
+faker==22.6.0
+streamlit==1.31.1
+redis==5.0.1
+pandas==2.2.0
+apache-flink==1.18.0
