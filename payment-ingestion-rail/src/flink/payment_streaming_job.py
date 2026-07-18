@@ -53,9 +53,14 @@ def run_payment_analytics_job():
             ts TIMESTAMP(3)
         ) WITH (
             'connector' = 'print'
+            'topic' = 'processed_payments',
+            'properties.bootstrap.servers' = 'kafka:29092',
+            'format' = 'json',
+            'sink.delivery-guarantee' = 'at-least-once'
         )
     """
     table_env.execute_sql(sink_ddl)
+    print("[+] Kafka downstream sink table mapping established.")
 
     # 6. Execute a simple continuous pipeline routing script to test processing
     print("[+] Launching live real-time stream transformation job pipeline...")
