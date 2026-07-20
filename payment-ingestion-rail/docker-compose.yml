@@ -7,7 +7,34 @@ networks:
     driver: bridge
 
 services:
-  # --- BULLET 2: KAFKA EVENT BUS ---
+  
+  # ============================================================================
+  # POSTGRESQL (Required for Airflow metadata - not in architecture but required)
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: payment_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: airflow123
+      POSTGRES_DB: airflow_db
+    ports:
+      - "5432:5432"
+    networks:
+      - ingestion_network
+      - analytics_network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # APACHE KAFKA (Event Streaming Bus) - FROM YOUR ARCHITECTURE
+  # ============================================================================
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: payment_kafka
@@ -16,6 +43,8 @@ services:
     networks:
       - ingestion_network
       - analytics_network
+    depends_on:
+      - postgres
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
@@ -31,70 +60,132 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server=localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
-  # --- BULLET 3: PYFLINK INFRASTRUCTURE ---
+  # ============================================================================
+  # APACHE FLINK JOBMANAGER (Stream Processing) - FROM YOUR ARCHITECTURE
+  # ============================================================================
   flink-jobmanager:
-    image: custom-pyflink:1.18.0  # Changed to reflect your actual 1.18 Dockerfile configuration
     build:
       context: .
       dockerfile: Dockerfile
     container_name: flink_jobmanager
     ports:
       - "8081:8081"
+      - "6123:6123"
+    volumes:
+      - ./src/flink:/opt/flink/usrlib
+      - ./flink-state/checkpoints:/opt/flink/checkpoints
+      - ./flink-state/savepoints:/opt/flink/savepoints
     networks:
       - analytics_network
       - ingestion_network
-    volumes:
-      - ./payment-ingestion-rail/src/flink:/opt/flink/usrlib
-    command: jobmanager
+    depends_on:
+      kafka:
+        condition: service_healthy
     environment:
-      - |
-        FLINK_PROPERTIES=
+      JOB_MANAGER_RPC_ADDRESS: flink-jobmanager
+      FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
+        taskmanager.memory.process.size: 2G
+        taskmanager.numberOfTaskSlots: 2
+        parallelism.default: 2
+        state.checkpoints.dir: file:///opt/flink/checkpoints
+        state.savepoints.dir: file:///opt/flink/savepoints
+        restart-strategy: fixed-delay
+        restart-strategy.fixed-delay.attempts: 10
+        restart-strategy.fixed-delay.delay: 10 s
+    command: jobmanager
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
+  # ============================================================================
+  # APACHE FLINK TASKMANAGER (Stream Processing Workers) - FROM YOUR ARCHITECTURE
+  # ============================================================================
   flink-taskmanager:
-    image: custom-pyflink:1.18.0  # Changed to match the JobManager custom image
-    container_name: flink_taskmanager
     build:
       context: .
       dockerfile: Dockerfile
-    depends_on:
-      - flink-jobmanager
+    container_name: flink_taskmanager
+    ports:
+      - "6121:6121"
+    volumes:
+      - ./src/flink:/opt/flink/usrlib
+      - ./flink-state/checkpoints:/opt/flink/checkpoints
+      - ./flink-state/savepoints:/opt/flink/savepoints
     networks:
       - analytics_network
       - ingestion_network
-    volumes:
-      - .:/opt/flink/workspace
-    command: taskmanager
+    depends_on:
+      - flink-jobmanager
     environment:
-      - |
-        FLINK_PROPERTIES=
+      JOB_MANAGER_RPC_ADDRESS: flink-jobmanager
+      FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
+        taskmanager.memory.process.size: 2G
         taskmanager.numberOfTaskSlots: 2
-        
-  # --- BULLET 4: APACHE AIRFLOW ORCHESTRATOR ---
+        state.checkpoints.dir: file:///opt/flink/checkpoints
+        state.savepoints.dir: file:///opt/flink/savepoints
+        restart-strategy: fixed-delay
+        restart-strategy.fixed-delay.attempts: 10
+        restart-strategy.fixed-delay.delay: 10 s
+    command: taskmanager
+    restart: unless-stopped
+
+  # ============================================================================
+  # APACHE AIRFLOW (Orchestration) - FROM YOUR ARCHITECTURE
+  # ============================================================================
   airflow:
-    image: puckel/docker-airflow:1.10.9
-    container_name: pipeline_airflow
+    image: apache/airflow:2.8.0-python3.11
+    container_name: payment_airflow
     ports:
       - "8080:8080"
     networks:
       - analytics_network
+      - ingestion_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:airflow123@postgres:5432/airflow_db
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW_HOME: /opt/airflow
     volumes:
-      - ./dags:/usr/local/airflow/dags
-    command: webserver
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+    command: >
+      bash -c "airflow db init &&
+               airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin 2>/dev/null || true &&
+               airflow webserver"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
 
-  # --- BULLET 3: LOCAL DATABRICKS / DELTA LAKE INFRASTRUCTURE (PySpark Engine) ---
-  spark-delta:
-    image: bde2020/spark-master:3.3.0-hadoop3.3
-    container_name: spark_lakehouse
-    ports:
-      - "8082:8080"
-      - "7077:7077"
-    networks:
-      - analytics_network
-    volumes:
-      - ./data:/opt/spark/data
-      - ./src:/opt/spark/src
-      - ./conf:/opt/spark/conf
-      
+  # ============================================================================
+  # NOTE: Databricks Delta Lake is CLOUD-BASED (not Docker)
+  # NOTE: Streamlit will run locally on your machine (not Docker)
+  # ============================================================================
+
+volumes:
+  postgres_data:
+    driver: local
+  kafka_data:
+    driver: local
+    

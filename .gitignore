@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Ignore local delta lake checkpoints and data
+data/
+payment-ingestion-rail/data/
+
+# Ignore pipeline runtime logs
+logs/
+payment-ingestion-rail/logs/

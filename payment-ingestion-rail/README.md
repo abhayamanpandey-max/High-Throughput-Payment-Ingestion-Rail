@@ -1,4 +1,4 @@
-﻿# 💳 High-Throughput Real-Time Payment Ingestion & Anomaly Mitigation Rail
+# 💳 High-Throughput Real-Time Payment Ingestion & Anomaly Mitigation Rail
 
 [![Tech Stack](https://shields.io)](#tech-stack)
 [![License: MIT](https://shields.io)](https://opensource.org)
