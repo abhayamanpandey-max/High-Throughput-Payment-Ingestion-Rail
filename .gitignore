@@ -16,3 +16,8 @@ payment-ingestion-rail/data/
 # Ignore pipeline runtime logs
 logs/
 payment-ingestion-rail/logs/
+
+
+.env
+*.log
+

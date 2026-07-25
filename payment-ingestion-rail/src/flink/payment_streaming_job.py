@@ -88,7 +88,7 @@ def run_payment_anomaly_detection():
             ts_string STRING,
             location STRING,
             device_ip STRING,
-            ts AS TO_TIMESTAMP(REPLACE(ts_string, 'T', ' ')),
+            ts AS TO_TIMESTAMP(REPLACE(ts_string, '[TZ]', ' '), 'yyyy-MM-dd HH:mm:ss.SSS'),
             WATERMARK FOR ts AS ts - INTERVAL '5' SECOND
         ) WITH (
             'connector' = 'kafka',
@@ -162,28 +162,28 @@ def run_payment_anomaly_detection():
             source.ts,
             CASE 
                 WHEN source.amount > 50000 THEN TRUE
-                WHEN source.amount > stats.avg_amount + (3 * stats.amount_stddev) THEN TRUE
+                WHEN source.amount > COALESCE(stats.avg_amount,0) + (3 * COALESCE(stats.amount_stddev,1)) THEN TRUE
                 ELSE FALSE 
             END as is_anomaly,
             CASE 
                 WHEN source.amount > 50000 THEN 1.0
-                WHEN source.amount > stats.avg_amount + (3 * stats.amount_stddev) 
-                    THEN ABS(source.amount - stats.avg_amount) / NULLIF(stats.amount_stddev, 0)
+                WHEN source.amount > COALESCE(stats.avg_amount,0) + (3 * COALESCE(stats.amount_stddev,1)) 
+                    THEN ABS(source.amount - COALESCE(stats.avg_amount,0)) / NULLIF(COALESCE(stats.amount_stddev,1), 0)
                 ELSE 0.0 
             END as anomaly_score
         FROM kafka_payment_source source
         LEFT JOIN payment_stats stats 
             ON source.account_id = stats.account_id 
             AND source.ts >= stats.window_start 
-            AND source.ts < stats.window_end
+            AND source.ts < stats.window_start + INTERVAL '10' SECOND
     """
     
     logger.info("[PIPELINE] Starting anomaly detection pipeline...")
     logger.info("[ANOMALY] Rules:")
     logger.info("  - Amount > $50,000 = CRITICAL ANOMALY")
     logger.info("  - Amount > mean + 3*stdev = STATISTICAL ANOMALY")
-    
-    table_env.execute_sql(processing_pipeline)
+    # execute_sql() triggers job execution for SQL jobs!
+    table_result = table_env.execute_sql(processing_pipeline)
     
     # ============================================================================
     # 7. EXECUTE JOB
@@ -192,7 +192,8 @@ def run_payment_anomaly_detection():
     logger.info("[METRICS] Consuming from: payment_transactions (Kafka)")
     logger.info("[METRICS] Writing to: payment_bronze (Kafka)")
     logger.info("[LATENCY] Target: Sub-200ms processing")
-
+    # env.execute("Payment Anomaly Detection Pipeline")
+    table_result.wait()
 if __name__ == "__main__":
     try:
         run_payment_anomaly_detection()

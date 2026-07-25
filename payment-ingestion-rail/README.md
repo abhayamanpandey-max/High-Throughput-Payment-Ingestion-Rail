@@ -138,3 +138,24 @@ Rolling aggregations powering fraud alerting systems.
 
 ----
    
+## Local vs Cloud Execution
+
+### Development (Local Delta Lake)
+```bash
+# Quick iteration without cloud costs
+python src/databricks/delta_lakehouse.py  # Tests locally against data/bronze|silver|gold
+```
+
+### Production (Databricks Cloud)
+```bash
+# Full end-to-end: Flink → Kafka → Databricks
+python src/databricks/databricks_loader.py  # Consumes from Kafka, writes to Databricks
+# Then: Run silver_transform.sql and gold_transform.sql in Databricks SQL Editor
+```
+
+### Architecture
+- **Bronze:** Raw payment events (Kafka → Databricks)
+- **Silver:** Deduplicated, cleaned (SQL merge pattern)
+- **Gold:** Minute-windowed anomaly metrics (aggregations)
+
+All three tiers support both local Delta files (for testing) and Databricks (production).
