@@ -2,8 +2,8 @@
 
 Production-grade data pipeline processing **44,830+ TPS** payment events with real-time anomaly detection.
 
-[![Tech Stack](https://shields.io)](#tech-stack)
-[![License: MIT](https://shields.io)](https://opensource.org)
+[![Tech Stack](https://img.shields.io/badge/Tech_Stack-Python_%7C_Spark_%7C_Kafka-blue?style=for-the-badge)](#tech-stack)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 
 ## Architecture Overview
