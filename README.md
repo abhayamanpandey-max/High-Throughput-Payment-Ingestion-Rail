@@ -2,8 +2,16 @@
 
 Production-grade data pipeline processing **44,830+ TPS** payment events with real-time anomaly detection.
 
-[![Tech Stack](https://shields.io)](#tech-stack)
-[![License: MIT](https://shields.io)](https://opensource.org)
+<!-- Badges Section -->
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
+[![Apache Flink](https://img.shields.io/badge/PyFlink-E6526F?style=for-the-badge&logo=apacheflink&logoColor=white)](https://flink.apache.org/)
+[![Databricks](https://img.shields.io/badge/Databricks-FF3621?style=for-the-badge&logo=databricks&logoColor=white)](https://databricks.com/)
+[![Delta Lake](https://img.shields.io/badge/Delta_Lake-000000?style=for-the-badge&logo=delta&logoColor=white)](https://delta.io/)
+[![Apache Airflow](https://img.shields.io/badge/Apache_Airflow-017CEE?style=for-the-badge&logo=apacheairflow&logoColor=white)](https://airflow.apache.org/)
+
+[![Tech Stack](https://img.shields.io/badge/Tech_Stack-Docker_%7C_Kafka_%7C_PyFlink_%7C_Databricks_%7C_Airflow-007ACC?style=for-the-badge)](#tech-stack)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 
 ## Architecture Overview
