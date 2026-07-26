@@ -7,9 +7,9 @@ networks:
     driver: bridge
 
 services:
-  
+
   # ============================================================================
-  # POSTGRESQL (Required for Airflow metadata - not in architecture but required)
+  # POSTGRESQL (Airflow metadata backend — not part of payment pipeline)
   # ============================================================================
   postgres:
     image: postgres:15-alpine
@@ -33,7 +33,12 @@ services:
     restart: unless-stopped
 
   # ============================================================================
-  # APACHE KAFKA (Event Streaming Bus) - FROM YOUR ARCHITECTURE
+  # APACHE KAFKA (Event Streaming Bus — KRaft mode, single-broker for dev)
+  #
+  # Production note: increase to 3 brokers and set:
+  #   KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+  #   KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+  #   KAFKA_MIN_INSYNC_REPLICAS: 2
   # ============================================================================
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -49,6 +54,7 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
       KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      # Single-broker dev setting — set to 3 in production
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -70,7 +76,7 @@ services:
     restart: unless-stopped
 
   # ============================================================================
-  # APACHE FLINK JOBMANAGER (Stream Processing) - FROM YOUR ARCHITECTURE
+  # APACHE FLINK JOBMANAGER (Stream Processing)
   # ============================================================================
   flink-jobmanager:
     build:
@@ -82,6 +88,7 @@ services:
       - "6123:6123"
     volumes:
       - ./src/flink:/opt/flink/usrlib
+      - ./src/databricks:/opt/flink/usrlib/databricks
       - ./flink-state/checkpoints:/opt/flink/checkpoints
       - ./flink-state/savepoints:/opt/flink/savepoints
     networks:
@@ -111,7 +118,7 @@ services:
     restart: unless-stopped
 
   # ============================================================================
-  # APACHE FLINK TASKMANAGER (Stream Processing Workers) - FROM YOUR ARCHITECTURE
+  # APACHE FLINK TASKMANAGER (Stream Processing Workers)
   # ============================================================================
   flink-taskmanager:
     build:
@@ -144,11 +151,14 @@ services:
     restart: unless-stopped
 
   # ============================================================================
-  # APACHE AIRFLOW (Orchestration) - FROM YOUR ARCHITECTURE
+  # APACHE AIRFLOW — Webserver + Scheduler (both required for DAGs to run)
+  #
+  # Previously only the webserver was started; without the scheduler, DAGs
+  # are visible in the UI but never actually execute.
   # ============================================================================
-  airflow:
+  airflow-webserver:
     image: apache/airflow:2.8.0-python3.11
-    container_name: payment_airflow
+    container_name: payment_airflow_webserver
     ports:
       - "8080:8080"
     networks:
@@ -163,8 +173,11 @@ services:
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW_HOME: /opt/airflow
+    env_file:
+      - .env
     volumes:
       - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
     command: >
@@ -178,9 +191,36 @@ services:
       retries: 5
     restart: unless-stopped
 
+  airflow-scheduler:
+    image: apache/airflow:2.8.0-python3.11
+    container_name: payment_airflow_scheduler
+    networks:
+      - analytics_network
+      - ingestion_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:airflow123@postgres:5432/airflow_db
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW_HOME: /opt/airflow
+    env_file:
+      - .env
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+    command: airflow scheduler
+    restart: unless-stopped
+
   # ============================================================================
   # NOTE: Databricks Delta Lake is CLOUD-BASED (not Docker)
-  # NOTE: Streamlit will run locally on your machine (not Docker)
+  # NOTE: Streamlit runs locally: streamlit run src/dashboard/streamlit_dashboard.py
   # ============================================================================
 
 volumes:
@@ -188,4 +228,3 @@ volumes:
     driver: local
   kafka_data:
     driver: local
-    
