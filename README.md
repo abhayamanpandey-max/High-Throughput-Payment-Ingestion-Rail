@@ -27,6 +27,20 @@ Production-grade data pipeline processing **44,830+ TPS** payment events with re
 - **Analytics:** Streamlit dashboards for real-time monitoring
 
 -----
+## 📊 Key System Metrics & Benchmark
+
+| Metric | Value | Details / Explanation |
+| :--- | :--- | :--- |
+| **TPS Achieved** | `44,830` | 8.9x the 5,000 TPS target |
+| **Processing Latency** | `< 200ms` | Sub-200ms from Kafka consume to Bronze write |
+| **Test Coverage** | `24 tests` | 15 producer + 9 transform tests, all green |
+| **Medallion Tiers** | `3` | Bronze (raw) → Silver (clean) → Gold (aggregated) |
+| **Window Size** | `10 seconds` | 10-second tumbling window for anomaly stats |
+| **Anomaly Threshold 1** | `$50,000` | Hard threshold for critical flag |
+| **Anomaly Threshold 2** | `mean + 3σ` | Statistical outlier detection |
+| **Checkpoint Interval** | `60 seconds` | Flink checkpoints every 60s for fault recovery |
+| **Kafka Batch** | `32KB / 5ms` | `linger.ms=5`, `batch.size=32KB`, LZ4 compression |
+
 ### Tech Stack: Docker, Apache Kafka, PyFlink, Databricks (Delta Lake), Apache Airflow
 
 ----
