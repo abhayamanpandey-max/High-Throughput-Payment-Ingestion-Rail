@@ -2,7 +2,11 @@
 
 Production-grade data pipeline processing **44,830+ TPS** payment events with real-time anomaly detection.
 
-[![Watch the Demo Video](https://img.youtube.com/vi/Utserjopy7o/maxresdefault.jpg)](https://youtu.be/Utserjopy7o)
+## 📹 Demo & Walkthrough
+
+[![YouTube](https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/Utserjopy7o)
+
+Watch the project overview and live walkthrough on [YouTube](https://youtu.be/Utserjopy7o).
 
 <!-- Badges Section -->
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
@@ -19,6 +23,9 @@ Production-grade data pipeline processing **44,830+ TPS** payment events with re
 ## Architecture Overview
 
 ![Payment Pipeline Architecture](./docs/payment_pipeline_architecture.png)
+
+## MY Youtube Demo video
+[![Watch the Demo Video](https://img.youtube.com/vi/Utserjopy7o/maxresdefault.jpg)](https://youtu.be/Utserjopy7o)
 
 ### Data Flow
 - **Ingestion:** 44,830 TPS via Docker multi-threaded driver (8.9x optimized!)
