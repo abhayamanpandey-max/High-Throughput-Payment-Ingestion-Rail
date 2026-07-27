@@ -2,6 +2,8 @@
 
 Production-grade data pipeline processing **44,830+ TPS** payment events with real-time anomaly detection.
 
+[![Watch the Demo Video](https://img.youtube.com/vi/Utserjopy7o/maxresdefault.jpg)](https://youtu.be/Utserjopy7o)
+
 <!-- Badges Section -->
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
