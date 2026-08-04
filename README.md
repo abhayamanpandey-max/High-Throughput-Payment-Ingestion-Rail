@@ -67,7 +67,7 @@ Watch the project overview and live walkthrough on [YouTube](https://youtu.be/Ut
 
 ---
 
-## 📊 Performance Achieved
+##  Performance Achieved
 
 | Metric | Target | Achieved | Notes |
 |--------|--------|----------|-------|
@@ -78,7 +78,7 @@ Watch the project overview and live walkthrough on [YouTube](https://youtu.be/Ut
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - Docker & Docker Compose
@@ -124,7 +124,7 @@ python src\databricks\databricks_loader.py
 
 ---
 
-## 📁 Component Breakdown
+##  Component Breakdown
 
 ### Phase 1: Ingestion Driver
 **File:** `src/producer/producer.py`
@@ -213,7 +213,7 @@ streamlit run src\dashboard\streamlit_dashboard.py
 
 ---
 
-### Core Architecture: 🏗️ Complete System Architecture (Mapped to Resume Bullets)
+### Core Architecture:  Complete System Architecture (Mapped to Resume Bullets)
 
 **Mapped to Resume Bullets**
 
@@ -246,7 +246,7 @@ streamlit run src\dashboard\streamlit_dashboard.py
 ------
 --
 
-## 📊 Medallion Data Schema Design
+##  Medallion Data Schema Design
 
 ### 1. Bronze Layer (Raw Event Storage)
 Stores raw, immutable JSON strings alongside critical platform auditing fields.
@@ -272,9 +272,8 @@ Rolling aggregations powering fraud alerting systems.
 
 ---
 
-## 🛠️ Codebase Structure
 
-## 📁 Project Structure
+##  Project Codebase  Structure
 
 ```
 payment-ingestion-rail/
@@ -310,7 +309,7 @@ payment-ingestion-rail/
 
 ---
 
-## 🚀 Execution & Deployment Guide
+##  Execution & Deployment Guide
 
 ### Prerequisites
 * Docker & Docker Compose
