@@ -2,7 +2,7 @@
 
 Production-grade data pipeline processing **44,830+ TPS** payment events with real-time anomaly detection.
 
-## 📹 Demo & Walkthrough
+##  Demo & Walkthrough
 
 [![YouTube](https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/Utserjopy7o)
 
@@ -36,7 +36,7 @@ Watch the project overview and live walkthrough on [YouTube](https://youtu.be/Ut
 - **Analytics:** Streamlit dashboards for real-time monitoring
 
 -----
-## 📊 Key System Metrics & Benchmark
+##  Key System Metrics & Benchmark
 
 | Metric | Value | Details / Explanation |
 | :--- | :--- | :--- |
@@ -171,7 +171,7 @@ streamlit run src\dashboard\streamlit_dashboard.py
 
 ---
 
-## 🏆 Interview Story
+##  Interview Story
 
 > "I engineered a high-throughput payment ingestion and anomaly detection pipeline that processes 44,830+ transactions per second.
 >
